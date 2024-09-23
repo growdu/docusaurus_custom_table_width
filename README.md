@@ -1,0 +1,2 @@
+# docusaurus_custom_table_width
+docusaurus_custom_table_width
