@@ -1,59 +1,74 @@
+// plugins/remark-table-width.js
 import { visit } from 'unist-util-visit';
 
 module.exports = function remarkTableWidth() {
   return (tree) => {
-    let tableWidth = '100%';
-    let columnWidths = [];
-    let need_remnove = 0;
+    // 初始化宽度信息
+    let pendingTableWidth = null;
+    let pendingColumnWidths = [];
 
-    // 尝试遍历所有节点
+    // 遍历所有节点
     visit(tree, (node, index, parent) => {
-      
-      // 检查文本节点以找出宽度信息
+      // 检查是否是文本节点或段落节点，以查找宽度信息
       if (node.type === 'text' || node.type === 'paragraph') {
-        const tableWidthMatch = node.value && node.value.match(/table-width:\s*([\d.]+%?)/i);
-        const columnWidthsMatch = node.value && node.value.match(/column-widths:\s*([\d.%\s]+)/i);
+        const textContent = node.value || node.children?.map(child => child.value).join('');
 
-        if (tableWidthMatch) {
-          tableWidth = tableWidthMatch[1];
-          console.warn('Found table width:', tableWidth);
-          need_remnove = 1;
-        }
+        if (textContent) {
+          // 匹配 table-width 指令
+          const tableWidthMatch = textContent.match(/table-width:\s*([\d.]+%?)/i);
+          // 匹配 column-widths 指令
+          const columnWidthsMatch = textContent.match(/column-widths:\s*([\d.%\s]+)/i);
 
-        if (columnWidthsMatch) {
-          columnWidths = columnWidthsMatch[1].split(/\s+/);
-          console.warn('Found column widths:', columnWidths);
-          need_remnove = 1;
-        }
+          if (tableWidthMatch) {
+            pendingTableWidth = tableWidthMatch[1];
+            console.warn('Found table width:', pendingTableWidth);
+          }
 
-        if (need_remnove) {
-          need_remnove = 0;
-          // 移除已处理的节点
-          console.warn("remove this node:", node.value);
-          parent.children.splice(index, 1);
-          return [visit.SKIP, index]; // 跳过这个节点
+          if (columnWidthsMatch) {
+            pendingColumnWidths = columnWidthsMatch[1].split(/\s+/);
+            console.warn('Found column widths:', pendingColumnWidths);
+          }
+
+          // 如果匹配到任何宽度信息，移除该节点
+          if (tableWidthMatch || columnWidthsMatch) {
+            if (parent && parent.children) {
+              parent.children.splice(index, 1);
+              return [visit.SKIP, index];
+            }
+          }
         }
       }
-    });
 
-    // 遍历所有表格节点并应用宽度
-    visit(tree, 'table', (node) => {
-      if (!node.data) node.data = {};
-      if (!node.data.hProperties) node.data.hProperties = {};
-      node.data.hProperties.style = `width: ${tableWidth};`;
+      // 检查是否是表格节点
+      if (node.type === 'table') {
+        // 如果有待应用的表格宽度，设置表格的宽度
+        if (pendingTableWidth) {
+          if (!node.data) node.data = {};
+          if (!node.data.hProperties) node.data.hProperties = {};
+          node.data.hProperties.style = `width: ${pendingTableWidth};`;
+          console.warn(`Applied table width: ${pendingTableWidth}`);
+          // 重置待应用的表格宽度
+          pendingTableWidth = null;
+        }
 
-      if (columnWidths.length > 0) {
-        node.children.forEach((child, rowIndex) => {
-          if (rowIndex === 0) { // 只对表头应用列宽
-            child.children.forEach((cell, cellIndex) => {
-              if (columnWidths[cellIndex]) {
-                if (!cell.data) cell.data = {};
-                if (!cell.data.hProperties) cell.data.hProperties = {};
-                cell.data.hProperties.style = `width: ${columnWidths[cellIndex]};`;
-              }
-            });
-          }
-        });
+        // 如果有待应用的列宽度，设置表格的列宽
+        if (pendingColumnWidths.length > 0) {
+          node.children.forEach((row, rowIndex) => {
+            if (rowIndex === 0) { // 只对表头应用列宽
+              row.children.forEach((cell, cellIndex) => {
+                const width = pendingColumnWidths[cellIndex];
+                if (width) {
+                  if (!cell.data) cell.data = {};
+                  if (!cell.data.hProperties) cell.data.hProperties = {};
+                  cell.data.hProperties.style = `width: ${width};`;
+                  console.warn(`Applied column ${cellIndex + 1} width: ${width}`);
+                }
+              });
+            }
+          });
+          // 重置待应用的列宽度
+          pendingColumnWidths = [];
+        }
       }
     });
   };
