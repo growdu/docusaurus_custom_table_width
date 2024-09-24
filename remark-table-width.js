@@ -10,14 +10,14 @@ module.exports = function remarkTableWidth() {
     // 遍历所有节点
     visit(tree, (node, index, parent) => {
       // 检查是否是文本节点或段落节点，以查找宽度信息
-      if (node.type === 'code' && node.lang === '{table-width}') {
+      if (node.type === 'code' && node.lang === '{table}') {
         const textContent = node.value || node.children?.map(child => child.value).join('');
 
         if (textContent) {
           // 匹配 table-width 指令
           const tableWidthMatch = textContent.match(/table-width:\s*([\d.]+%?)/i);
           // 匹配 column-widths 指令
-          const columnWidthsMatch = textContent.match(/column-widths:\s*([\d.%\s]+)/i);
+          const columnWidthsMatch = textContent.match(/widths:\s*([\d.%\s]+)/i);
 
           if (tableWidthMatch) {
             pendingTableWidth = tableWidthMatch[1];
@@ -25,7 +25,10 @@ module.exports = function remarkTableWidth() {
           }
 
           if (columnWidthsMatch) {
-            pendingColumnWidths = columnWidthsMatch[1].split(/\s+/);
+            // 分割并转换为数字，乘以 10
+            pendingColumnWidths = columnWidthsMatch[1]
+              .split(/\s+/)
+              .map(width => `${parseInt(width, 10) * 10}%`); // 转换为百分比
             console.warn('Found column widths:', pendingColumnWidths);
           }
 
