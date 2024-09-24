@@ -10,7 +10,7 @@ module.exports = function remarkTableWidth() {
     // 遍历所有节点
     visit(tree, (node, index, parent) => {
       // 检查是否是文本节点或段落节点，以查找宽度信息
-      if (node.type === 'text' || node.type === 'paragraph') {
+      if (node.type === 'code' && node.lang === '{table-width}') {
         const textContent = node.value || node.children?.map(child => child.value).join('');
 
         if (textContent) {
